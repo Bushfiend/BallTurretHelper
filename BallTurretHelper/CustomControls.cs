@@ -14,92 +14,80 @@ using Sandbox.Game.Entities.Blocks;
 using Sandbox.Game.Entities.Cube;
 using Sandbox.Game.Entities;
 using System.Reflection;
+using HarmonyLib;
 using Sandbox.Game.Entities.Cube.CubeBuilder;
 using VRageMath;
+using Sandbox.Game.Gui;
 
 namespace BallTurretHelper
 {
-    [MySessionComponentDescriptor(MyUpdateOrder.BeforeSimulation)]
 
-    public class CustomControls : MySessionComponentBase
+    public class CustomControls
     {
-        public override void LoadData()
-        {
-            MyAPIGateway.TerminalControls.CustomControlGetter -= InsertControl;
-            MyAPIGateway.TerminalControls.CustomControlGetter += InsertControl;
-        }
-        protected override void UnloadData()
-        {
-            MyAPIGateway.TerminalControls.CustomControlGetter -= InsertControl;
-        }
 
-        public static void InsertControl(IMyTerminalBlock block, List<IMyTerminalControl> controls)
+        
+
+        private static bool IsVisible(MyMotorStator block)
         {
+            return true;
+            return block.DefinitionId == MyDefinitionId.Parse("MyObjectBuilder_MotorAdvancedStator/LargeHinge");
+         }
 
-            if (!(block is IMyMechanicalConnectionBlock))
-                return;
 
-            var myTerminalControlButton = MyAPIGateway.TerminalControls.CreateControl<IMyTerminalControlButton, IMyMotorAdvancedStator>("ExtraSmallHinge");
-            myTerminalControlButton.Title = MyStringId.GetOrCompute("Add (Very) Small Part");
-            myTerminalControlButton.Tooltip = MyStringId.GetOrCompute("Adds The Smallest Hinge Part, Perfect For Ball Turrets!.");
-            myTerminalControlButton.SupportsMultipleBlocks = false;
-            myTerminalControlButton.Action = Action;
-            myTerminalControlButton.Enabled = Enable;
-            myTerminalControlButton.Visible = Visible;
-            controls.Insert(13, myTerminalControlButton);
+         private static bool IsEnabled(MyMotorStator block)
+         {
+             return block.TopBlock == null;
+         }
+
+        private static void Action(MyMotorStator block)
+        {
+            AddSmallPart(block);
         }
 
-        private static bool Visible(IMyTerminalBlock block)
+         private static readonly FieldInfo CubeBuilderState =
+             typeof(MyCubeBuilder).GetField("m_cubeBuilderState", BindingFlags.Instance | BindingFlags.NonPublic);
+         public static void ClearBuilder()
+         {
+             var cubeBuilderState = (MyCubeBuilderState)CubeBuilderState.GetValue(MyCubeBuilder.Static);
+             cubeBuilderState.CurrentBlockDefinition = null;
+         }
+         public static void AddSmallPart(IMyTerminalBlock block)
+         {
+
+            var motorBase = (MyMotorBase)block;
+
+            ClearBuilder();
+
+            var def = MyDefinitionManager.Static.GetCubeBlockDefinition(MyDefinitionId.Parse("MyObjectBuilder_MotorAdvancedRotor/SmallHingeHead"));
+
+            var matrix = MatrixD.CreateWorld(Vector3D.Transform(motorBase.DummyPosition, motorBase.CubeGrid.WorldMatrix), motorBase.WorldMatrix.Forward, motorBase.WorldMatrix.Up);
+
+            double offsetAmount = 0.4;
+            var offsetMatrix = MatrixD.CreateTranslation(new Vector3D(0, offsetAmount, 0));
+            matrix = MatrixD.Multiply(offsetMatrix, matrix);
+
+
+            MyCubeBuilder.Static.AddBlocksToBuildQueueOrSpawn(def, ref matrix, Vector3I.Zero, Vector3I.Zero,
+                Vector3I.Zero, Quaternion.Zero);
+
+            AttachLoop.MotorBase = motorBase;
+         }
+
+         [HarmonyPatch(typeof(MyMotorStator), "CreateTerminalControls")]
+         class CreateTerminalControlsPatch
         {
-            MyDefinitionId hingeId;
-            MyDefinitionId.TryParse("MyObjectBuilder_MotorAdvancedStator/LargeHinge", out hingeId);
-            return (MyDefinitionId)block.BlockDefinition == hingeId;
-        }
+             static void Postfix()
+             {
+                var title = MyStringId.GetOrCompute("Add Very Small Head");
+                var tooltip = MyStringId.GetOrCompute("Adds Smallest Hinge Part.");
+                MyTerminalControlButton<MyMotorStator> controlButton = new MyTerminalControlButton<MyMotorStator>("AddVerySmallHingeTopPart", title, tooltip, Action);
+                controlButton.Enabled = IsEnabled;
+                controlButton.Visible = IsVisible;
+                MyTerminalControlFactory.AddControl<MyMotorStator>(12,controlButton);
 
 
-        private static bool Enable(IMyTerminalBlock block)
-        {
-            var motorBase = block as IMyMotorBase;
-
-            return motorBase.Top == null;
-        }
-
-        private static void Action(IMyTerminalBlock block)
-        {
-            if (block is MyMotorBase)
-            {
-                var motorBase = block as MyMotorBase;
-
-                if (motorBase.TopBlock != null)
-                    return;
-
-                ClearBuilder();
-
-                var def = MyDefinitionManager.Static.GetCubeBlockDefinition(MyDefinitionId.Parse("MyObjectBuilder_MotorAdvancedRotor/SmallHingeHead"));
-
-                var matrix = MatrixD.CreateWorld(Vector3D.Transform(motorBase.DummyPosition, motorBase.CubeGrid.WorldMatrix), motorBase.WorldMatrix.Forward, motorBase.WorldMatrix.Up);
-
-                double offsetAmount = 0.4;
-                var offsetMatrix = MatrixD.CreateTranslation(new Vector3D(0, offsetAmount, 0));
-                matrix = MatrixD.Multiply(offsetMatrix, matrix);
-
-
-                MyCubeBuilder.Static.AddBlocksToBuildQueueOrSpawn(def, ref matrix, Vector3I.Zero, Vector3I.Zero,
-                    Vector3I.Zero, Quaternion.Zero);
-
-                AttachLoop.MotorBase = motorBase;
             }
-
-        }
-
-        private static readonly FieldInfo CubeBuilderState =
-            typeof(MyCubeBuilder).GetField("m_cubeBuilderState", BindingFlags.Instance | BindingFlags.NonPublic);
-        public static void ClearBuilder()
-        {
-            var cubeBuilderState = (MyCubeBuilderState)CubeBuilderState.GetValue(MyCubeBuilder.Static);
-            cubeBuilderState.CurrentBlockDefinition = null;
-        }
-
+         }
 
     }
 }

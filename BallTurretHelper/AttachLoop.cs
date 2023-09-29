@@ -4,7 +4,14 @@ using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
+using Sandbox.Definitions;
+using Sandbox.Game.Entities;
 using Sandbox.Game.Entities.Blocks;
+using Sandbox.Game.Entities.Cube;
+using Sandbox.Game.Entities.Cube.CubeBuilder;
+using Sandbox.ModAPI;
+using VRage.Game;
+using VRageMath;
 
 namespace BallTurretHelper
 {
@@ -32,14 +39,21 @@ namespace BallTurretHelper
             if (MotorBase == null)
                 return;
 
-            if (_ticks < 5)
+            if (MotorBase.TopBlock != null)
+            {
+                MotorBase = null;
+                _ticks = 0;
+                return;
+            }
+
+            if (_ticks < 4)
             {
                 _ticks++;
-
                 CallAttach(MotorBase);
                 return;
             }
 
+            
             _ticks = 0;
             MotorBase = null;
         }
