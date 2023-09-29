@@ -17,7 +17,7 @@ namespace BallTurretHelper
         public void Init(object gameInstance)
         {
             harmony = new Harmony("Helper");
-            harmony.PatchAll();
+            harmony.PatchAll(Assembly.GetExecutingAssembly());
         }
 
 
