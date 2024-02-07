@@ -18,27 +18,16 @@ using HarmonyLib;
 using Sandbox.Game.Entities.Cube.CubeBuilder;
 using VRageMath;
 using Sandbox.Game.Gui;
+using System.Reflection.Emit;
+using Sandbox.Common.ObjectBuilders.Definitions;
 
 namespace BallTurretHelper
 {
 
     public class CustomControls
     {
-
-        
-
-        private static bool IsVisible(MyMotorStator block)
-        {
-            return true;
-            return block.DefinitionId == MyDefinitionId.Parse("MyObjectBuilder_MotorAdvancedStator/LargeHinge");
-         }
-
-
-         private static bool IsEnabled(MyMotorStator block)
-         {
-             return block.TopBlock == null;
-         }
-
+       
+     
         private static void Action(MyMotorStator block)
         {
             AddSmallPart(block);
@@ -60,6 +49,9 @@ namespace BallTurretHelper
 
             var def = MyDefinitionManager.Static.GetCubeBlockDefinition(MyDefinitionId.Parse("MyObjectBuilder_MotorAdvancedRotor/SmallHingeHead"));
 
+            if (def == null)
+                return;
+
             var matrix = MatrixD.CreateWorld(Vector3D.Transform(motorBase.DummyPosition, motorBase.CubeGrid.WorldMatrix), motorBase.WorldMatrix.Forward, motorBase.WorldMatrix.Up);
 
             double offsetAmount = 0.4;
@@ -73,21 +65,39 @@ namespace BallTurretHelper
             AttachLoop.MotorBase = motorBase;
          }
 
-         [HarmonyPatch(typeof(MyMotorStator), "CreateTerminalControls")]
+
+        [HarmonyPatch(typeof(MyMotorStator), "CreateTerminalControls")]
+        class CreateTerminalControlsPatchPrefix
+        {
+            static void Prefix()
+            {
+                if (!MyTerminalControlFactory.AreControlsCreated<MyMotorStator>())
+                    _controlsCreated = false;           
+            }
+        }
+
+        [HarmonyPatch(typeof(MyMotorStator), "CreateTerminalControls")]
          class CreateTerminalControlsPatch
         {
              static void Postfix()
              {
+                if (!MyTerminalControlFactory.AreControlsCreated<MyMotorStator>())
+                    _controlsCreated = false;
+
+                if (MyTerminalControlFactory.AreControlsCreated<MyMotorStator>() && _controlsCreated)
+                    return;
+
                 var title = MyStringId.GetOrCompute("Add Very Small Head");
-                var tooltip = MyStringId.GetOrCompute("Adds Smallest Hinge Part.");
+                var tooltip = MyStringId.GetOrCompute("Add Very Small Head.");
                 MyTerminalControlButton<MyMotorStator> controlButton = new MyTerminalControlButton<MyMotorStator>("AddVerySmallHingeTopPart", title, tooltip, Action);
-                controlButton.Enabled = IsEnabled;
-                controlButton.Visible = IsVisible;
-                MyTerminalControlFactory.AddControl<MyMotorStator>(12,controlButton);
+                controlButton.Enabled = (MyMotorStator b) => b.TopBlock == null;
+                controlButton.Visible = (MyMotorStator b) => b.MotorDefinition.RotorType == MyRotorType.Hinge;
+                MyTerminalControlFactory.AddControl<MyMotorStator>(15, controlButton);
+                _controlsCreated = true;
 
 
             }
          }
-
+        private static bool _controlsCreated;
     }
 }

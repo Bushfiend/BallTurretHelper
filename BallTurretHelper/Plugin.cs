@@ -26,6 +26,7 @@ namespace BallTurretHelper
             if (MySession.Static == null)
                 return;
 
+
             AttachLoop.Update();
         }
 

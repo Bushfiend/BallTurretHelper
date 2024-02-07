@@ -30,9 +30,9 @@ namespace BallTurretHelper
             if (CallAttachMethod != null)
             {
                 CallAttachMethod.Invoke(block, new object[] { });
-            }
-                
+            }               
         }
+
 
         public static void Update()
         {
